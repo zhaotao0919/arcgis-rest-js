@@ -186,6 +186,11 @@ export interface IUserSessionOptions {
    * Duration (in minutes) that a refresh token will be valid.
    */
   refreshTokenTTL?: number;
+
+  /**
+   * An unfederated ArcGIS Server instance that recognizes the supplied credentials.
+   */
+  server?: string;
 }
 
 /**
@@ -519,6 +524,11 @@ export class UserSession implements IAuthenticationManager {
   public readonly refreshTokenTTL: number;
 
   /**
+   * An unfederated ArcGIS Server instance that recognizes the supplied credentials.
+   */
+  public readonly server: string;
+
+  /**
    * Hydrated by a call to [getUser()](#getUser-summary).
    */
   private _user: IUser;
@@ -730,25 +740,43 @@ export class UserSession implements IAuthenticationManager {
 
     this._pendingTokenRequests[root] = request(`${root}/rest/info`)
       .then((response: any) => {
-        return response.owningSystemUrl;
+        return response;
       })
-      .then(owningSystemUrl => {
-        /**
-         * if this server is not owned by this portal or the stand-alone
-         * instance of ArcGIS Server doesn't advertise federation,
-         * bail out with an error since we know we wont
-         * be able to generate a token
-         */
-        if (
-          !owningSystemUrl ||
-          !new RegExp(owningSystemUrl, "i").test(this.portal)
+      .then(response => {
+        if (response.owningSystemUrl) {
+          /**
+           * if this server is not owned by this portal
+           * bail out with an error since we know we wont
+           * be able to generate a token
+           */
+          if (!new RegExp(response.owningSystemUrl, "i").test(this.portal)) {
+            throw new ArcGISAuthError(
+              `${url} is not federated with ${this.portal}.`,
+              "NOT_FEDERATED"
+            );
+          } else {
+            return request(
+              `${response.owningSystemUrl}/sharing/rest/info`,
+              requestOptions
+            );
+          }
+        } else if (
+          response.authInfo &&
+          this.trustedServers[root] !== undefined
         ) {
+          /**
+           * if its a stand-alone instance of ArcGIS Server that doesn't advertise
+           * federation at all and the root url is recognized, use its built in token endpoint.
+           */
+          return new Promise((resolve, reject) => {
+            resolve({ authInfo: response.authInfo });
+          });
+        } else {
           throw new ArcGISAuthError(
             `${url} is not federated with ${this.portal}.`,
             "NOT_FEDERATED"
           );
         }
-        return request(`${owningSystemUrl}/sharing/rest/info`, requestOptions);
       })
       .then((response: any) => {
         return response.authInfo.tokenServicesUrl;
@@ -768,7 +796,8 @@ export class UserSession implements IAuthenticationManager {
             params: {
               username: this.username,
               password: this.password,
-              expiration: this.tokenDuration
+              expiration: this.tokenDuration,
+              client: "referer"
             }
           }).then((response: any) => {
             this._token = response.token;
