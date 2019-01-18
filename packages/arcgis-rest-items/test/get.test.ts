@@ -3,9 +3,9 @@
 
 import * as fetchMock from "fetch-mock";
 
-import { getItem, getItemData, getItemResources } from "../src/get";
+import { getItem, getItemData, getRelatedItems, getItemResources } from "../src/get";
 
-import { ItemResponse, ItemDataResponse } from "./mocks/item";
+import { ItemResponse, ItemDataResponse, RelatedItemsResponse } from "./mocks/item";
 
 import { GetItemResourcesResponse } from "./mocks/resources";
 
@@ -37,7 +37,7 @@ describe("get", () => {
     fetchMock.once("*", ItemDataResponse);
 
     getItemData("3ef")
-      .then(response => {
+      .then(() => {
         expect(fetchMock.called()).toEqual(true);
         const [url, options]: [string, RequestInit] = fetchMock.lastCall("*");
         expect(url).toEqual(
@@ -77,6 +77,48 @@ describe("get", () => {
     } else {
       done();
     }
+  });
+
+  it("should return related items", done => {
+    fetchMock.once("*", RelatedItemsResponse);
+
+    getRelatedItems({
+      id: "3ef",
+      relationshipType: "Service2Layer"
+    })
+      .then(() => {
+        expect(fetchMock.called()).toEqual(true);
+        const [url, options]: [string, RequestInit] = fetchMock.lastCall("*");
+        expect(url).toEqual(
+          "https://www.arcgis.com/sharing/rest/content/items/3ef/relatedItems?f=json&relationshipType=Service2Layer"
+        );
+        expect(options.method).toBe("GET");
+        done();
+      })
+      .catch(e => {
+        fail(e);
+      });
+  });
+
+  it("should return related items for more than one relationship type", done => {
+    fetchMock.once("*", RelatedItemsResponse);
+
+    getRelatedItems({
+      id: "3ef",
+      relationshipType: ["Service2Layer", "Area2CustomPackage"]
+    })
+      .then(() => {
+        expect(fetchMock.called()).toEqual(true);
+        const [url, options]: [string, RequestInit] = fetchMock.lastCall("*");
+        expect(url).toEqual(
+          "https://www.arcgis.com/sharing/rest/content/items/3ef/relatedItems?f=json&relationshipTypes=Service2Layer%2CArea2CustomPackage"
+        );
+        expect(options.method).toBe("GET");
+        done();
+      })
+      .catch(e => {
+        fail(e);
+      });
   });
 
   describe("Authenticated methods", () => {
@@ -120,11 +162,31 @@ describe("get", () => {
       fetchMock.once("*", ItemDataResponse);
 
       getItemData("3ef", MOCK_USER_REQOPTS)
-        .then(response => {
+        .then(() => {
           expect(fetchMock.called()).toEqual(true);
           const [url, options]: [string, RequestInit] = fetchMock.lastCall("*");
           expect(url).toEqual(
             "https://myorg.maps.arcgis.com/sharing/rest/content/items/3ef/data?f=json&token=fake-token"
+          );
+          expect(options.method).toBe("GET");
+          done();
+        })
+        .catch(e => {
+          fail(e);
+        });
+    });
+
+    it("get related items", done => {
+      fetchMock.once("*", RelatedItemsResponse);
+      getRelatedItems({
+        id: "3ef",
+        relationshipType: "Service2Layer",
+        ...MOCK_USER_REQOPTS
+      })
+        .then(() => {
+          const [url, options]: [string, RequestInit] = fetchMock.lastCall("*");
+          expect(url).toEqual(
+            "https://myorg.maps.arcgis.com/sharing/rest/content/items/3ef/relatedItems?f=json&relationshipType=Service2Layer&token=fake-token"
           );
           expect(options.method).toBe("GET");
           done();
@@ -140,7 +202,7 @@ describe("get", () => {
         id: "3ef",
         ...MOCK_USER_REQOPTS
       })
-        .then(response => {
+        .then(() => {
           const [url, options]: [string, RequestInit] = fetchMock.lastCall("*");
           expect(url).toEqual(
             "https://myorg.maps.arcgis.com/sharing/rest/content/items/3ef/resources"
@@ -163,7 +225,7 @@ describe("get", () => {
           resourcesPrefix: "foolder"
         }
       })
-        .then(response => {
+        .then(() => {
           const [url, options]: [string, RequestInit] = fetchMock.lastCall("*");
           expect(url).toEqual(
             "https://myorg.maps.arcgis.com/sharing/rest/content/items/3ef/resources"
