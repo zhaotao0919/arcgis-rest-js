@@ -1,12 +1,13 @@
 /* Copyright (c) 2018 Environmental Systems Research Institute, Inc.
  * Apache-2.0 */
 
-import { request, getPortalUrl } from "@esri/arcgis-rest-request";
+import { request, getPortalUrl, appendCustomParams } from "@esri/arcgis-rest-request";
 
 import {
   IItemIdRequestOptions,
   IItemResourceRequestOptions,
-  determineOwner
+  determineOwner,
+  IManageItemRelationshipRequestOptions,
 } from "./helpers";
 
 /**
@@ -31,6 +32,35 @@ export function removeItem(
     requestOptions.id
   }/delete`;
   return request(url, requestOptions);
+}
+
+/**
+ * ```js
+ * import { removeItemRelationship } from '@esri/arcgis-rest-items';
+ * //
+ * removeItemRelationship({
+ *   originItemId: '3ef',
+ *   destinationItemId: 'ae7',
+ *   relationshipType: 'Service2Layer',
+ *   authentication
+ * })
+ *   .then(response)
+ * ```
+ * Remove a relationship between two items. See the [REST Documentation](https://developers.arcgis.com/rest/users-groups-and-items/delete-relationship.htm) for more information.
+ *
+ * @param requestOptions - Options for the request
+ * @returns A Promise to add item resources.
+ */
+export function removeItemRelationship(
+  requestOptions: IManageItemRelationshipRequestOptions
+): Promise<{ "success": boolean }> {
+  const owner = determineOwner(requestOptions);
+  const url = `${getPortalUrl(requestOptions)}/content/users/${owner}/removeRelationship`;
+
+  const options = { params: {}, ...requestOptions }
+  appendCustomParams(requestOptions, options);
+
+  return request(url, options);
 }
 
 /**

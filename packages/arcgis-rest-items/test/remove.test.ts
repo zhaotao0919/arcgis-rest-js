@@ -3,7 +3,7 @@
 
 import * as fetchMock from "fetch-mock";
 
-import { removeItem, removeItemResource } from "../src/remove";
+import { removeItem, removeItemResource, removeItemRelationship } from "../src/remove";
 
 import { ItemSuccessResponse } from "./mocks/item";
 
@@ -71,6 +71,35 @@ describe("search", () => {
           expect(options.method).toBe("POST");
           expect(options.body).toContain(encodeParam("f", "json"));
           expect(options.body).toContain(encodeParam("token", "fake-token"));
+          done();
+        })
+        .catch(e => {
+          fail(e);
+        });
+    });
+
+    it("should delete an item relationship", done => {
+      fetchMock.once("*", { success: true });
+      
+      removeItemRelationship({
+        originItemId: "3ef",
+        destinationItemId: "ae7",
+        relationshipType: "Area2CustomPackage",
+        ...MOCK_USER_REQOPTS
+      })
+        .then(() => {
+          expect(fetchMock.called()).toEqual(true);
+          const [url, options]: [string, RequestInit] = fetchMock.lastCall("*");
+          expect(url).toEqual(
+            "https://myorg.maps.arcgis.com/sharing/rest/content/users/casey/removeRelationship"
+          );
+          expect(options.method).toBe("POST");
+          expect(options.body).toContain("originItemId=3ef");
+          expect(options.body).toContain("destinationItemId=ae7");
+          expect(options.body).toContain("relationshipType=Area2CustomPackage");
+          expect(options.body).toContain("f=json");
+          expect(options.body).toContain("token=fake-token");
+
           done();
         })
         .catch(e => {
